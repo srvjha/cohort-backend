@@ -191,4 +191,158 @@ const logout = async (req, res) => {
 
 }
 
-export { register, verifyUser, login, logout }
+const forgotPassword = async(req,res)=>{
+    // get email
+    // now get user
+    // generate reset token and expiry date
+    // send mail
+    // success message
+  
+   try {
+     const {email} = req.body;
+     if(!email){
+       return res.status(400).json({
+         message:"Email is required"
+       })
+     }
+     const user  = await User.findOne({email});
+   
+     if(!user){
+       return res.status(400).json({
+         message:"User not found"
+       })
+     }
+   
+     const token = crypto.randomBytes(32).toString("hex");
+   
+     user.resetPasswordToken = token;
+     user.resetPasswordExpiry = Date.now() + 10 * 60 * 1000
+   
+     await user.save();
+   
+     const transporter = nodemailer.createTransport({
+       host: process.env.MAILTRAP_HOST,
+       port: process.env.MAILTRAP_PORT,
+       secure: false, 
+       auth: {
+         user: process.env.MAILTRAP_USERNAME,
+         pass: process.env.MAILTRAP_PASSWORD,
+       },
+     });
+   
+     const mailOptions = {
+       from:process.env.MAILTRAP_SENDERMAIL,
+       to: user.email,
+       subject: "Reset your Password", 
+       text: `Please click on the link ${process.env.BASE_URI}/api/v1/users/reset-password/${token}`, 
+     }
+   
+     await transporter.sendMail(mailOptions)
+   
+     return res.status(200).json({
+       message:"Reset Link Successfully!!"
+     })
+   }
+    catch (error) {
+    console.log("error: ",error)
+    return res.status(500).json({
+      message:"Internal Server Down!!",
+      error:error.message
+    })
+   }
+  }
+  
+  const resetPassword = async(req,res)=>{
+    try {
+      const {token} = req.params;
+      const {password} = req.body;
+      console.log("token: ",token)
+      if(!token){
+        return res.status(400).json({
+          success:true,
+          message:"Invalid Token",
+        })
+      }
+  
+      if(!password){
+        return res.status(400).json({
+          success:true,
+          message:"Please enter password",
+        })
+      }
+  
+      const user = await User.findOne({
+        resetPasswordToken:token,
+        resetPasswordExpiry:{
+          $gt:Date.now()
+        }
+      })
+  
+      if(!user){
+        
+          return res.status(400).json({
+            success:true,
+            message:"User not found!!",
+          })
+        
+      }
+  
+      user.password = password;
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpiry = undefined;
+  
+      await user.save();
+  
+      return res.status(200).json({
+        message:"Password reset succesfully"
+      })
+    } catch (error) {
+      console.log("Error: ",error);
+      return res.status(500).json({
+        success:false,
+        message:"Internal Server Down",
+        error:error.message,
+      })
+    }
+  }
+  
+  const changePassword = async(req,res)=>{
+   try {
+     const {oldPassword,newPassword} = req.body;
+     const {token} = req.cookies;
+   
+     const decodeToken = jwt.verify(token,process.env.JWTSECRET);
+     const {id} = decodeToken;
+   
+     const user  = await User.findById(id);
+     if(!user){
+       return res.status(400).json({
+         success:true,
+         message:"User not found!!",
+       })
+     }
+   
+     const isMatched = await bcrypt.compare(oldPassword,user.password);
+     if(!isMatched){
+       return res.status(400).json({
+         success:true,
+         message:"Password not matched!!",
+       })
+     }
+   
+     user.password = newPassword;
+     await user.save();
+     return res.status(200).json({
+       message:"Password changed succesfully"
+     })
+   } catch (error) {
+    console.log("Error: ",error);
+    return res.status(500).json({
+      success:false,
+      message:"Internal Server Down",
+      error:error.message,
+    })
+   }
+  }
+  
+  export {register,verifyUser,login,logout,forgotPassword,resetPassword,changePassword}

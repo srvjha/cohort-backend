@@ -438,9 +438,9 @@ const changePassword = async(req,res)=>{
 }
 
 const refreshAccessToken = async(req,res)=>{
-  console.log("hello")
+ 
   const incomingRefreshToken = req.cookies.refreshToken;
-  console.log("incomingRefreshToken: ",incomingRefreshToken)
+  // console.log("incomingRefreshToken: ",incomingRefreshToken)
   if(!incomingRefreshToken){
     return res.status(400).json({
       success:false,
@@ -450,9 +450,9 @@ const refreshAccessToken = async(req,res)=>{
 
   try {
     const decodedToken = jwt.verify(incomingRefreshToken,process.env.REFRESH_TOKEN_SECRET);
-    console.log("decodedToken: ",decodedToken)
+    // console.log("decodedToken: ",decodedToken)
     const user = await User.findById(decodedToken?._id);
-    console.log("user: ",user)
+    // console.log("user: ",user)
     if(!user){
       return res.status(400).json({
         success:false,
@@ -475,14 +475,24 @@ const refreshAccessToken = async(req,res)=>{
      const{accessToken,refreshToken:newRefreshToken}= await generateAccessAndRefreshToken(user._id)
    
       res
-     .status(200)
+      .status(200)
      .cookie("accessToken",accessToken,options)
      .cookie("refreshToken",newRefreshToken,options)
+     .json({
+      success:true,
+      message:"Token refreshed successfully."
+     })
+     
      return { accessToken, refreshToken: newRefreshToken };
   } catch (error) {
   
     console.log("Error refreshing token: ", error);
-    return null;
+    return res.status(500)
+    .json({
+      success:true,
+      message:"Internal Server Error.",
+      error:error.message
+     })
   }
 }
 
